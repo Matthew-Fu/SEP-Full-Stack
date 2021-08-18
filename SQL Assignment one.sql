@@ -60,7 +60,7 @@ where ProductID between 400 and 500
 --from the Production.Product table restricted to the colors black and blue
 select ProductID, Name, Color
 from Production.Product
-where ProductID between 400 and 500
+where color in ('Black', 'blue')
 
 --10.	Write a query to generate a report on products that begins with the letter S. 
 select Name
