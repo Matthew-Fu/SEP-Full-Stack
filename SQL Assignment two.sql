@@ -143,7 +143,7 @@ Country                        Province
 select pc.name as Country, ps.name as Province
 from person. CountryRegion pc
 join person. StateProvince ps on pc.CountryRegionCode = ps.CountryRegionCode
-where pc.name in ('Germany', 'Canada')
+where pc.name not in ('Germany', 'Canada')
 
 /*       Using Northwnd Database: (Use aliases for all the Joins)
 14.	List all Products that has been sold at least once in last 25 years.*/
@@ -192,22 +192,24 @@ where o.orderdate > '1998-01-01'
 --20.	List the names of all customers with most recent order dates 
 select c.ContactName as Customers, max(o.orderdate) as MostRecentOrderDates
 from orders o 
-join customers c on o.customerid = c.customerid
+right join customers c on o.customerid = c.customerid
 group by c.ContactName
 
 --21.	Display the names of all customers  along with the  count of products they bought 
 select c.ContactName as Customers, sum(od.Quantity) as countofproducts
 from Customers c 
-join orders o on c.CustomerID = o.customerID
-join [Order Details] od on o.orderID = od.orderID
+left join orders o on c.CustomerID = o.customerID
+left join [Order Details] od on o.orderID = od.orderID
 group by c.ContactName
 
 --22.	Display the customer ids who bought more than 100 Products with count of products.
-select o.CustomerID
-from orders o 
-join [Order Details] od on o.orderid = od.orderid
-group by o.customerid
-having sum(od.quantity) > 100
+SELECT c.CustomerID, SUM(od.Quantity) AS QTY 
+FROM Customers c 
+LEFT JOIN Orders o ON c.CustomerID = o.CustomerID
+LEFT JOIN [Order Details] od ON o.OrderID = od.OrderID
+GROUP BY c.CustomerID
+HAVING SUM(od.Quantity) > 100
+ORDER BY QTY;
 
 /*23.	List all of the possible ways that suppliers can ship their products. 
 Display the results as below
@@ -259,7 +261,7 @@ create table T1(F1 int)
 insert into T1 values (1), (2), (3)
 create table T2(F2 int)
 insert into T2 values (2), (3), (4)
-select F1 
+select * 
 from T1
 inner join T2 on T1.F1 = T2.F2
 /* result
