@@ -162,18 +162,19 @@ from Orders
 --10.	List one city, if exists, 
 --that is the city from where the employee sold most orders (not the product quantity) is, 
 --and also the city of most total quantity of products ordered from. (tip: join  sub-query)
-select a.ShipCity
-from (select top 1 ShipCity, count(orderID) as CountOrder
-from orders
-group by ShipCity
+select a.City
+from (select top 1 e.City, count(o.orderID) as CountOrder
+from orders o
+join Employees e on o.EmployeeID = e.EmployeeID
+group by e.City
 order by 2 desc) a
 join 
-(select top 1 e.City, max(od.Quantity) as maxQuantity
+(select top 1 e.City, sum(od.Quantity) as sumQuantity
 from [Order Details] od 
 join orders o on od.OrderID = o.OrderID
 join Employees e on o.EmployeeID = e.EmployeeID
 group by e.City
-order by maxQuantity desc) b on a.ShipCity = b.City
+order by sumQuantity desc) b on a.City = b.City
 
 /*11. How do you remove the duplicates record of a table? 
 Insert the distinct rows from the duplicate rows table to new temporary table. 
