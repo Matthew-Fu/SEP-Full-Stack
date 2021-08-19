@@ -152,7 +152,6 @@ select City
 from Employees
 where City not in (select ShipCity
 from Orders)
-
 --b.	Do not use sub-query
 Select City
 from Employees
@@ -174,7 +173,7 @@ from [Order Details] od
 join orders o on od.OrderID = o.OrderID
 join Employees e on o.EmployeeID = e.EmployeeID
 group by e.City
-order by maxQuantity) b on a.ShipCity = b.City
+order by maxQuantity desc) b on a.ShipCity = b.City
 
 /*11. How do you remove the duplicates record of a table? 
 Insert the distinct rows from the duplicate rows table to new temporary table. 
