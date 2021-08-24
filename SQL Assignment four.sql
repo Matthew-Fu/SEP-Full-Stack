@@ -69,7 +69,7 @@ in response to certain events on a particular table or view in a database.
 The trigger is mostly used for maintaining the integrity of the information on the database.
 2) DDL Trigger
 DML Trigger
-Logon Trigger
+Log on Trigger
 
 9.	What are the scenarios to use Triggers?
 Log table modifications. Some tables have sensitive data such as customer email, 
@@ -85,47 +85,116 @@ A trigger is a stored procedure that runs automatically when various events happ
 
 use Northwind
 go
+/*Use Northwind database. All questions are based on assumptions described 
+by the Database Diagram sent to you yesterday. When inserting, make up info if necessary. 
+Write query for each step. Do not use IDE. BE CAREFUL WHEN DELETING DATA OR DROPPING TABLE.*/
 --1.	Lock tables Region, Territories, EmployeeTerritories and Employees. 
+LOCK TABLE Region, Territories, EmployeeTerritories, Employees IN EXCLUSIVE MODE
 --Insert following information into the database. 
 --In case of an error, no changes should be made to DB.
 --a.	A new region called “Middle Earth”;
-insert into Lock (Region) values ('Middle Earth')
+select * from Region
+begin tran
+insert into Region (RegionDescription) values ('Middle Earth')
+commit
 --b.	A new territory called “Gondor”, belongs to region “Middle Earth”;
-update Lock set Territories = 'Aragorn King' where Region = 'Middle Earth'
+select * from Territories
+begin tran
+insert into Territories (TerritoryDescription, RegionID) values ("Gondor", 5)
+commit
 --c.	A new employee “Aragorn King” who's territory is “Gondor”.
-insert into Lock (Territories, Employee) values ('Gondor', 'Aragorn King')
+begin tran
+insert into Employees (FirstName, Title, Country) values ("Aragorn", "King", "Gondor")
+commit
 --2.	Change territory “Gondor” to “Arnor”.
-update Lock set Territories = 'Gondor' where Territories = 'Arnor'
-
+begin tran
+update Territories set TerritoryDescription = 'Arnor' where TerritoryDescription = 'Gondor'
+commit
 --3.	Delete Region “Middle Earth”. (tip: remove referenced data first) 
 --(Caution: do not forget WHERE or you will delete everything.) 
 --In case of an error, no changes should be made to DB. Unlock the tables mentioned 
 --in question 1.
-Delete from Lock where Region = 'Middle Earth'
+ALTER TABLE Territories
+DROP CONSTRAINT FK_Territories_Region;
+Delete from Region where RegionDescription = 'Middle Earth'
+ALTER TABLE Territories
+ADD CONSTRAINT FK_Territories_Region Foreign key (RegionID) references Region(RegionID);
 
 --4.	Create a view named "view_product_order_[your_last_name]", 
 --list all products and total ordered quantity for that product.
-create view view_product_order_[your_last_name] as 
+create view view_product_order_Fu as 
 select productID, sum(quantity) as Total_Quantity
 from [Order_details]
 group by productID
 
 --5.	Create a stored procedure “sp_product_order_quantity_[your_last_name]” 
 --that accept product id as an input and total quantities of order as output parameter.
+create proc sp_product_order_quantity_Fu
+@productid int,
+@total_quantities int out
+as
+begin
+select productid, @total_quantities = sum(quantity) 
+from [Order_details]
+where productid = @productid
+group by @productid
+end
 
 --6.	Create a stored procedure “sp_product_order_city_[your_last_name]” 
 --that accept product name as an input and top 5 cities that ordered most 
 --that product combined with the total quantity of that product ordered from that city as output.
+create proc sp_product_order_city_Fu
+@productname varchar(20)
+@city varchar(20) OUT
+@total_quantity varchar(20) out
+as
+begin
+select @productname, a.avgPrice, @city = b.ShipCity
+from
+(select Top 5 ProductID, @total_quantity = sum(Quantity), sum(UnitPrice*(1-Discount)*Quantity)/sum(Quantity) as avgPrice
+from [Order Details] where @productname = productname
+group by ProductID
+order by @total_quantity desc) a
+left join
+(select @city = o.ShipCity, od.ProductID, @total_quantity = sum(Quantity), rank() over (partition by od.ProductID order by sum(Quantity) desc) RNK
+from Orders o
+join [Order Details] od on o.orderID = od.OrderID where @productname = productname
+group by @city, od.ProductID) b on a.ProductID = b.ProductID
+where b.RNK = 1 and @productname = a.productname
+end
 
 --7.	Lock tables Region, Territories, EmployeeTerritories and Employees. 
 --Create a stored procedure “sp_move_employees_[your_last_name]” 
 --that automatically find all employees in territory “Tory”; 
 --if more than 0 found, insert a new territory “Stevens Point” of region “North” 
 --to the database, and then move those employees to “Stevens Point”.
+LOCK TABLE Region, Territories, EmployeeTerritories, Employees IN EXCLUSIVE MODE
+create proc sp_move_employees_Fu
+as
+begin
+select e.EmployeeID
+from EmployeeTerritories e join Territories t on e.TerritoryID = t.TerritoryID
+where t.TerritoryDescription = 'Tory'
+insert into Territories (TerritoryDescription, RegionID) values ("StevensPoint", 3)
+--???
+end
 
---8.	Create a trigger that when there are more than 100 employees in territory 
---“Stevens Point”, move them back to Troy. (After test your code,) remove the trigger. 
+--8.	Create a trigger that when there are more than 100 employees in territory “Stevens Point”, 
+--move them back to Troy. (After test your code,) remove the trigger. 
 --Move those employees back to “Troy”, if any. Unlock the tables.
+create trigger trg_after_100_employee on territories
+after insert
+as 
+begin
+   declare @num int, @add int
+   select @num = count(*) from Territories
+   select @add = count(*) from (select e.EmployeeID
+from EmployeeTerritories e join Territories t on e.TerritoryID = t.TerritoryID
+where t.TerritoryDescription = 'Tory')
+   if @num + @add > 100
+      update Territories set TerritoryDescription = "Troy" where TerritoryDescription = "StevensPoint"
+      delete trg_after_100_employee
+end
 
 --9.	Create 2 new tables “people_your_last_name” “city_your_last_name”. 
 --City table has two records: {Id:1, City: Seattle}, {Id:2, City: Green Bay}. 
@@ -135,26 +204,55 @@ group by productID
 --Create a view “Packers_your_name” lists all people from Green Bay. 
 --If any error occurred, no changes should be made to DB. (after test) 
 --Drop both tables and view.
-create table people_your_last_name (id int, Name varchar(20), City int)
-create table city_your_last_name (id int, name varchar(20))
-insert into city_your_last_name values (1, 'Seattle'), (2, 'Green Bay')
-insert into people_your_last_name values (1, 'Aaron Rodgers', 2), (2, 'Russell Wilson', 1), (3, 'Jody Nelson', 2)
-update city_your_last_name set City = 'Madison' where City = 'Seattle'
-create view Packers_your_name as
-select people_your_last_name.ID from people_your_last_name
-where people_your_last_name.city = city_your_last_name.id
-Drop table city_your_last_name
-drop table people_your_last_name
+create table people_your_Fu (id int, Name varchar(20), City int)
+create table city_your_Fu (id int, name varchar(20))
+insert into city_your_Fu values (1, 'Seattle'), (2, 'Green Bay')
+insert into people_your_Fu values (1, 'Aaron Rodgers', 2), (2, 'Russell Wilson', 1), (3, 'Jody Nelson', 2)
+update city_your_Fu set City = 'Madison' where City = 'Seattle'
+create view Packers_Fu as
+select people_your_Fu.ID from people_your_Fu
+where people_your_Fu.city = city_your_Fu.id
+Drop table city_your_Fu
+drop table people_your_Fu
 
 --10.	 Create a stored procedure “sp_birthday_employees_[you_last_name]” 
 --that creates a new table “birthday_employees_your_last_name” 
 --and fill it with all employees that have a birthday on Feb. 
 --(Make a screen shot) drop the table. Employee table should not be affected.
+create proc sp_birthday_employees_Fu
+as
+begin
+create table birthday_employees_Fu (identity(1,1) primary key, Name)
+insert into birthday_employees_Fu values (
+select LastName + ' ' + FirstName as [name] from Employees where month(birthdate) = 2)
+end
 
 --11.	Create a stored procedure named “sp_your_last_name_1” that returns all cites 
 --that have at least 2 customers who have bought no or only one kind of product. 
 --Create a stored procedure named “sp_your_last_name_2” 
 --that returns the same but using a different approach. (sub-query and no-sub-query).
+Create proc sp_your_Fu_1
+as
+begin
+select c.City
+from (select c.CustomerID, c.City
+from [Order Details] od join Orders o on od.OrderID = o.OrderID
+join Customers c on o.CustomerID = c.CustomerID
+group by c.CustomerID, od.ProductID, C.City
+having count(*) <= 1) a join Customers c on a.City = c.City
+group by c.City
+having count(*) >= 2
+end
+
+Create proc sp_your_Fu_2
+as 
+begin
+select c.City
+from  [Order Details] od join Orders o on od.OrderID = o.OrderID
+join Customers c on o.CustomerID = c.CustomerID
+group by c.CustomerID, od.ProductID, C.City
+having count(od.ProductID) <= 1 and count(c.CustomerID) >= 2
+end
 
 --12.	How do you make sure two tables have the same data?
 SELECT * FROM Table1
